@@ -29,13 +29,19 @@ object AskPattern extends App {
       } yield opRead
     }
 
-  val mainForName = WhatIsYourName andThen MainCmd.apply _
+  def opAskMain[T, U](target: ActorRef[MainCmd[T]], msg: ActorRef[U] => T): Operation[U, U] =
+    OpDSL[U] { implicit opDSL =>
+      for {
+        self <- opProcessSelf
+        _ = target ! MainCmd(msg(self))
+      } yield opRead
+    }
 
   val main =
     OpDSL[Nothing] { implicit opDSL =>
       for {
         hello <- opSpawn(sayName.named("hello"))
-        greeting <- opCall(opAsk(hello, mainForName).named("getGreeting"))
+        greeting <- opCall(opAskMain(hello, WhatIsYourName).named("getGreeting"))
         world <- opFork(sayName.named("world"))
         name <- opCall(opAsk(world.ref, WhatIsYourName).named("getName"))
       } yield {
